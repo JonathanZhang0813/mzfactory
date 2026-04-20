@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>帽子生成器 - 帽筒+帽沿</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body {
+            background: linear-gradient(145deg, #f5f0e8 0%, #e8e0d5 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        .card {
+            background: rgba(255, 248, 235, 0.95);
+            border-radius: 64px;
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 245, 215, 0.6);
+            padding: 30px 28px 38px;
+            max-width: 700px;
+            width: 100%;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(2px);
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.2rem;
+            margin: 0 0 8px 0;
+            letter-spacing: 2px;
+            color: #4a3728;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        h1 span {
+            font-size: 2rem;
+        }
+        .sub {
+            text-align: center;
+            color: #8b694a;
+            margin-bottom: 28px;
+            font-weight: 500;
+            border-bottom: 2px dashed #e2c7a8;
+            display: inline-block;
+            width: auto;
+            margin-left: auto;
+            margin-right: auto;
+            padding-bottom: 6px;
+        }
+        .rule-badge {
+            background: #efe1cf;
+            border-radius: 60px;
+            padding: 10px 18px;
+            display: inline-flex;
+            gap: 24px;
+            margin-bottom: 28px;
+            justify-content: center;
+            width: 100%;
+            font-weight: bold;
+        }
+        .rule-badge div {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: white;
+            padding: 5px 18px;
+            border-radius: 40px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .rule-badge kbd {
+            background: #2c2c2c;
+            color: #ffecb3;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+        .preview-area {
+            background: #fef7e9;
+            border-radius: 48px;
+            padding: 32px 20px;
+            margin: 20px 0;
+            box-shadow: inset 0 1px 6px rgba(90, 50, 25, 0.08), 0 10px 20px rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 280px;
+        }
+        .hat-stack {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0px;
+        }
+        .hat-stack img {
+            display: block;
+            max-width: 180px;
+            width: 100%;
+            height: auto;
+            object-fit: contain;
+            transition: transform 0.1s ease;
+        }
+        /* 不同部件之间不留空隙，紧密堆叠 */
+        .input-group {
+            margin: 20px 0 12px;
+        }
+        textarea {
+            width: 100%;
+            padding: 18px 20px;
+            font-size: 1.6rem;
+            font-family: monospace;
+            border: 3px solid #ddbc94;
+            border-radius: 56px;
+            background: white;
+            resize: vertical;
+            text-align: center;
+            font-weight: bold;
+            letter-spacing: 4px;
+            color: #3e2a1f;
+            outline: none;
+            transition: 0.2s;
+        }
+        textarea:focus {
+            border-color: #b97f44;
+            box-shadow: 0 0 0 3px rgba(185, 127, 68, 0.3);
+        }
+        .button-bar {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        button {
+            background: #5d3a1f;
+            border: none;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: bold;
+            padding: 12px 28px;
+            border-radius: 40px;
+            cursor: pointer;
+            transition: 0.15s;
+            box-shadow: 0 3px 5px rgba(0,0,0,0.2);
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+        button:hover {
+            background: #7e4f2c;
+            transform: scale(0.97);
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+        .reset-btn {
+            background: #b48b5a;
+        }
+        .download-btn {
+            background: #2c6e2c;
+        }
+        footer {
+            text-align: center;
+            font-size: 0.7rem;
+            color: #ac8e6f;
+            margin-top: 24px;
+        }
+        .error-msg {
+            color: #c2571a;
+            text-align: center;
+            margin-top: 10px;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>
+        <span>🎩</span> 帽子生成器 <span>🧢</span>
+    </h1>
+    <div style="text-align: center;">
+        <div class="rule-badge">
+            <div><kbd>帽</kbd> 🧥 帽筒</div>
+            <div><kbd>子</kbd> 🧢 帽沿</div>
+        </div>
+    </div>
+
+    <div class="preview-area">
+        <div id="hatContainer" class="hat-stack">
+            <!-- 动态生成的帽子图片会显示在这里 -->
+            <div style="color: #b87333; text-align: center; padding: 20px;">✨ 输入「帽子」试试 ✨</div>
+        </div>
+    </div>
+
+    <div class="input-group">
+        <textarea id="hatInput" rows="2" placeholder="例如：帽子  或  帽帽帽子子  或  帽子子子...">帽子</textarea>
+    </div>
+
+    <div class="button-bar">
+        <button id="generateBtn">✨ 生成帽子</button>
+        <button id="resetBtn" class="reset-btn">🗑️ 清空</button>
+        <button id="downloadBtn" class="download-btn">📸 下载图片</button>
+    </div>
+    <div id="errorMsg" class="error-msg"></div>
+    <footer>用「帽」「子」叠出专属帽子 • 帽筒在上 • 「子」总是在最底部</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+
+    const IMAGE_MAP = {
+        '帽': 'https://jonathanzhang0813.github.io/m.png',   
+        '子': 'https://jonathanzhang0813.github.io/z.png'    
+    };
+    const inputTextarea = document.getElementById('hatInput');
+    const generateBtn = document.getElementById('generateBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const hatContainer = document.getElementById('hatContainer');
+    const errorMsgDiv = document.getElementById('errorMsg');
+
+    // 核心渲染函数
+    function renderHatFromText(text) {
+        // 过滤掉空格、换行等，只保留 '帽' 和 '子'
+        const chars = text.split('');
+        const validChars = chars.filter(ch => ch === '帽' || ch === '子');
+        
+        if (validChars.length === 0) {
+            hatContainer.innerHTML = '<div style="color: #b87333; text-align: center; padding: 20px;">🍂 至少输入一个「帽」或「子」</div>';
+            return;
+        }
+
+        // 生成图片DOM
+        const fragment = document.createDocumentFragment();
+        for (let i = 0; i < validChars.length; i++) {
+            const ch = validChars[i];
+            const imgUrl = IMAGE_MAP[ch];
+            if (!imgUrl) {
+                console.warn(`没有找到字符 "${ch}" 对应的图片`);
+                continue;
+            }
+            const img = document.createElement('img');
+            img.src = imgUrl;
+            img.alt = ch === '帽' ? '帽筒' : '帽沿';
+            img.style.display = 'block';
+            img.style.margin = '0 auto';
+            // 控制最大宽度，避免撑爆
+            img.style.maxWidth = '200px';
+            img.style.width = '100%';
+            img.style.height = 'auto';
+            // 为了视觉舒服，帽沿稍微横向延伸一点（可选，通过css控制）
+            if (ch === '子') {
+                img.style.width = '110%';
+                img.style.maxWidth = '220px';
+                img.style.marginLeft = '-5%';
+            }
+            fragment.appendChild(img);
+        }
+        hatContainer.innerHTML = '';
+        hatContainer.appendChild(fragment);
+    }
+
+    // 生成并自动适应底部帽沿样式 (确保无论叠多少，最后一个是帽沿的时候看起来舒服)
+    function generateHat() {
+        let rawText = inputTextarea.value;
+        if (!rawText.trim()) {
+            errorMsgDiv.innerText = '❓ 请在输入框里写点什么～ 例如「帽子」';
+            return;
+        }
+        errorMsgDiv.innerText = '';
+        renderHatFromText(rawText);
+    }
+
+    // 清空输入 & 重置预览
+    function resetAll() {
+        inputTextarea.value = '';
+        hatContainer.innerHTML = '<div style="color: #b87333; text-align: center; padding: 20px;">✨ 输入「帽子」试试 ✨</div>';
+        errorMsgDiv.innerText = '';
+    }
+
+    // 下载为图片 (使用 html2canvas)
+    async function downloadAsImage() {
+        const previewDiv = document.querySelector('.preview-area');
+        if (!previewDiv) return;
+        
+        // 临时添加更好的背景圆角捕捉
+        try {
+            const canvas = await html2canvas(previewDiv, {
+                backgroundColor: '#fef7e9',
+                scale: 2,          // 高清图
+                logging: false,
+                useCORS: true,     // 如果你的图片支持跨域，或放在同域下最好
+                allowTaint: false
+            });
+            const link = document.createElement('a');
+            link.download = 'my_hat.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            errorMsgDiv.innerText = '✅ 图片已下载！';
+            setTimeout(() => {
+                if (errorMsgDiv.innerText === '✅ 图片已下载！') errorMsgDiv.innerText = '';
+            }, 2000);
+        } catch (err) {
+            console.error(err);
+            errorMsgDiv.innerText = '❌ 截图失败，可能是图片跨域问题，可尝试将图片上传到同域名下';
+        }
+    }
+
+    // 绑定事件
+    generateBtn.addEventListener('click', generateHat);
+    resetBtn.addEventListener('click', resetAll);
+    downloadBtn.addEventListener('click', downloadAsImage);
+    
+    // 初次加载演示 "帽子"
+    window.addEventListener('DOMContentLoaded', () => {
+        inputTextarea.value = '帽子';
+        generateHat();
+    });
+</script>
+</body>
+</html>
