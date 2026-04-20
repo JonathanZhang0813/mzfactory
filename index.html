@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>帽子生成器 - 自动去白边版</title>
+    <title>帽子生成器</title>
     <style>
         * {
             box-sizing: border-box;
@@ -75,11 +75,10 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 0px;  /* 关键：0间距 */
+            gap: 0px;
         }
         .hat-stack img {
             display: block;
-            /* 不设固定宽度，让图片按原始比例显示 */
             height: auto;
             object-fit: contain;
         }
@@ -178,7 +177,7 @@
         <button id="downloadBtn" class="download-btn">📸 下载图片</button>
     </div>
     <div id="errorMsg" class="error-msg"></div>
-    <footer>帽筒和帽沿会自动紧密贴合，不留空隙</footer>
+    <footer>自动去除图片周围的透明区域和白色背景，紧密贴合</footer>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -188,13 +187,24 @@
         '子': 'https://jonathanzhang0813.github.io/mzfactory/z.png'    
     };
 
-    // 缓存图片的实际内容尺寸（裁剪掉透明边距后）
     const imageContentCache = {};
 
-    // 获取图片实际内容尺寸（去除透明边距）
+    // 判断像素是否应该被视为"空白"（透明 或 白色/接近白色）
+    function isBlankPixel(r, g, b, a) {
+        // 透明像素
+        if (a < 30) return true;
+        // 白色/接近白色的像素（RGB每个分量都 > 245，或者总和 > 735）
+        // 阈值可以调整，数字越小越严格（会裁掉更多浅色区域）
+        const threshold = 245;
+        if (r > threshold && g > threshold && b > threshold) return true;
+        // 备选：总和判断（更宽松）
+        // if (r + g + b > 735) return true;
+        return false;
+    }
+
+    // 获取图片实际内容尺寸（去除透明和白色边距）
     function getImageContentSize(imgElement) {
         return new Promise((resolve) => {
-            // 创建一个离屏canvas来检测图片的透明边界
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             
@@ -209,12 +219,19 @@
             let bottom = 0;
             let left = canvas.width;
             let right = 0;
+            let foundAny = false;
             
-            // 遍历像素，找到非透明区域的范围
+            // 遍历所有像素，找到非空白区域的范围
             for (let y = 0; y < canvas.height; y++) {
                 for (let x = 0; x < canvas.width; x++) {
-                    const alpha = data[(y * canvas.width + x) * 4 + 3];
-                    if (alpha > 10) { // 不是透明像素
+                    const idx = (y * canvas.width + x) * 4;
+                    const r = data[idx];
+                    const g = data[idx + 1];
+                    const b = data[idx + 2];
+                    const a = data[idx + 3];
+                    
+                    if (!isBlankPixel(r, g, b, a)) {
+                        foundAny = true;
                         if (x < left) left = x;
                         if (x > right) right = x;
                         if (y < top) top = y;
@@ -223,31 +240,39 @@
                 }
             }
             
-            resolve({
-                width: right - left + 1,
-                height: bottom - top + 1,
-                topOffset: top,
-                leftOffset: left
-            });
+            if (!foundAny) {
+                // 如果整张图都是空白，返回原始尺寸
+                resolve({
+                    width: canvas.width,
+                    height: canvas.height,
+                    topOffset: 0,
+                    leftOffset: 0
+                });
+            } else {
+                resolve({
+                    width: right - left + 1,
+                    height: bottom - top + 1,
+                    topOffset: top,
+                    leftOffset: left
+                });
+            }
         });
     }
 
-    // 加载图片并自动裁剪透明边距
+    // 加载图片并自动裁剪空白区域（透明+白色）
     function loadAndCropImage(url) {
         return new Promise((resolve, reject) => {
             const img = new Image();
-            img.crossOrigin = 'Anonymous'; // 处理跨域
+            img.crossOrigin = 'Anonymous';
             img.onload = async () => {
                 try {
                     const contentSize = await getImageContentSize(img);
                     
-                    // 创建裁剪后的canvas
                     const canvas = document.createElement('canvas');
                     canvas.width = contentSize.width;
                     canvas.height = contentSize.height;
                     const ctx = canvas.getContext('2d');
                     
-                    // 将图片的可见区域绘制到新canvas
                     ctx.drawImage(
                         img,
                         contentSize.leftOffset, contentSize.topOffset,
@@ -268,7 +293,6 @@
         });
     }
 
-    // 预加载并裁剪两张图片
     let croppedImages = {
         '帽': null,
         '子': null
@@ -280,7 +304,6 @@
             croppedImages['帽'] = await loadAndCropImage(IMAGE_MAP['帽']);
             croppedImages['子'] = await loadAndCropImage(IMAGE_MAP['子']);
             imagesReady = true;
-            // 如果当前有输入，重新渲染
             if (inputTextarea.value.trim()) {
                 generateHat();
             }
@@ -297,7 +320,6 @@
     const hatContainer = document.getElementById('hatContainer');
     const errorMsgDiv = document.getElementById('errorMsg');
 
-    // 核心渲染函数 - 使用裁剪后的图片，紧密堆叠
     function renderHatFromText(text) {
         if (!imagesReady) {
             hatContainer.innerHTML = '<div class="loading-tip">⏳ 图片加载中，请稍候...</div>';
@@ -312,7 +334,7 @@
             return;
         }
 
-        // 找出一组图片中的最大宽度，统一缩放比例（可选）
+        // 计算最大宽度，统一缩放
         let maxWidth = 0;
         for (const ch of validChars) {
             const img = croppedImages[ch];
@@ -321,20 +343,16 @@
             }
         }
         
-        // 设定目标显示宽度（最大200px，同时保持比例）
         const targetDisplayWidth = Math.min(maxWidth, 200);
         
         const fragment = document.createDocumentFragment();
-        for (let i = 0; i < validChars.length; i++) {
-            const ch = validChars[i];
+        for (const ch of validChars) {
             const croppedImg = croppedImages[ch];
             if (!croppedImg) continue;
             
-            // 复制图片节点（因为同一个img不能重复append）
             const clonedImg = croppedImg.cloneNode(true);
             clonedImg.style.display = 'block';
             clonedImg.style.margin = '0 auto';
-            // 统一宽度，高度自适应，确保对齐
             clonedImg.style.width = targetDisplayWidth + 'px';
             clonedImg.style.height = 'auto';
             
@@ -391,12 +409,10 @@
     resetBtn.addEventListener('click', resetAll);
     downloadBtn.addEventListener('click', downloadAsImage);
     
-    // 开始预加载图片
     preloadImages();
     
     window.addEventListener('DOMContentLoaded', () => {
         inputTextarea.value = '帽子';
-        // 等待图片加载完成后自动生成
         const checkReady = setInterval(() => {
             if (imagesReady) {
                 generateHat();
