@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>帽子生成器</title>
+    <title>帽子生成器 - 自动去白边版</title>
     <style>
         * {
             box-sizing: border-box;
@@ -26,34 +26,12 @@
             padding: 30px 28px 38px;
             max-width: 700px;
             width: 100%;
-            transition: all 0.2s ease;
-            backdrop-filter: blur(2px);
         }
         h1 {
             text-align: center;
             font-size: 2.2rem;
             margin: 0 0 8px 0;
-            letter-spacing: 2px;
             color: #4a3728;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-        }
-        h1 span {
-            font-size: 2rem;
-        }
-        .sub {
-            text-align: center;
-            color: #8b694a;
-            margin-bottom: 28px;
-            font-weight: 500;
-            border-bottom: 2px dashed #e2c7a8;
-            display: inline-block;
-            width: auto;
-            margin-left: auto;
-            margin-right: auto;
-            padding-bottom: 6px;
         }
         .rule-badge {
             background: #efe1cf;
@@ -64,7 +42,6 @@
             margin-bottom: 28px;
             justify-content: center;
             width: 100%;
-            font-weight: bold;
         }
         .rule-badge div {
             display: flex;
@@ -73,7 +50,6 @@
             background: white;
             padding: 5px 18px;
             border-radius: 40px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
         .rule-badge kbd {
             background: #2c2c2c;
@@ -99,17 +75,14 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 0px;
+            gap: 0px;  /* 关键：0间距 */
         }
         .hat-stack img {
             display: block;
-            max-width: 180px;
-            width: 100%;
+            /* 不设固定宽度，让图片按原始比例显示 */
             height: auto;
             object-fit: contain;
-            transition: transform 0.1s ease;
         }
-        /* 不同部件之间不留空隙，紧密堆叠 */
         .input-group {
             margin: 20px 0 12px;
         }
@@ -127,7 +100,6 @@
             letter-spacing: 4px;
             color: #3e2a1f;
             outline: none;
-            transition: 0.2s;
         }
         textarea:focus {
             border-color: #b97f44;
@@ -150,17 +122,10 @@
             border-radius: 40px;
             cursor: pointer;
             transition: 0.15s;
-            box-shadow: 0 3px 5px rgba(0,0,0,0.2);
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
         }
         button:hover {
             background: #7e4f2c;
             transform: scale(0.97);
-        }
-        button:active {
-            transform: scale(0.95);
         }
         .reset-btn {
             background: #b48b5a;
@@ -180,29 +145,31 @@
             margin-top: 10px;
             font-size: 0.8rem;
         }
+        .loading-tip {
+            color: #b87333;
+            text-align: center;
+            padding: 20px;
+        }
     </style>
 </head>
 <body>
 <div class="card">
-    <h1>
-        <span>🎩</span> 帽子生成器 <span>🧢</span>
-    </h1>
+    <h1>🎩 帽子生成器 🧢</h1>
     <div style="text-align: center;">
         <div class="rule-badge">
-            <div><kbd>帽</kbd> 🧥 帽筒</div>
-            <div><kbd>子</kbd> 🧢 帽沿</div>
+            <div><kbd>帽</kbd> 帽筒</div>
+            <div><kbd>子</kbd> 帽沿</div>
         </div>
     </div>
 
     <div class="preview-area">
         <div id="hatContainer" class="hat-stack">
-            <!-- 动态生成的帽子图片会显示在这里 -->
-            <div style="color: #b87333; text-align: center; padding: 20px;">✨ 输入「帽子」试试 ✨</div>
+            <div class="loading-tip">✨ 输入「帽子」试试 ✨</div>
         </div>
     </div>
 
     <div class="input-group">
-        <textarea id="hatInput" rows="2" placeholder="例如：帽子  或  帽帽帽子子  或  帽子子子...">帽子</textarea>
+        <textarea id="hatInput" rows="2" placeholder="例如：帽子  或  帽帽帽子子">帽子</textarea>
     </div>
 
     <div class="button-bar">
@@ -211,16 +178,118 @@
         <button id="downloadBtn" class="download-btn">📸 下载图片</button>
     </div>
     <div id="errorMsg" class="error-msg"></div>
-    <footer>用「帽」「子」叠出专属帽子 • 帽筒在上 • 「子」总是在最底部</footer>
+    <footer>帽筒和帽沿会自动紧密贴合，不留空隙</footer>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script>
-
     const IMAGE_MAP = {
         '帽': 'https://jonathanzhang0813.github.io/mzfactory/m.png',   
         '子': 'https://jonathanzhang0813.github.io/mzfactory/z.png'    
     };
+
+    // 缓存图片的实际内容尺寸（裁剪掉透明边距后）
+    const imageContentCache = {};
+
+    // 获取图片实际内容尺寸（去除透明边距）
+    function getImageContentSize(imgElement) {
+        return new Promise((resolve) => {
+            // 创建一个离屏canvas来检测图片的透明边界
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = imgElement.naturalWidth;
+            canvas.height = imgElement.naturalHeight;
+            ctx.drawImage(imgElement, 0, 0);
+            
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            
+            let top = canvas.height;
+            let bottom = 0;
+            let left = canvas.width;
+            let right = 0;
+            
+            // 遍历像素，找到非透明区域的范围
+            for (let y = 0; y < canvas.height; y++) {
+                for (let x = 0; x < canvas.width; x++) {
+                    const alpha = data[(y * canvas.width + x) * 4 + 3];
+                    if (alpha > 10) { // 不是透明像素
+                        if (x < left) left = x;
+                        if (x > right) right = x;
+                        if (y < top) top = y;
+                        if (y > bottom) bottom = y;
+                    }
+                }
+            }
+            
+            resolve({
+                width: right - left + 1,
+                height: bottom - top + 1,
+                topOffset: top,
+                leftOffset: left
+            });
+        });
+    }
+
+    // 加载图片并自动裁剪透明边距
+    function loadAndCropImage(url) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'Anonymous'; // 处理跨域
+            img.onload = async () => {
+                try {
+                    const contentSize = await getImageContentSize(img);
+                    
+                    // 创建裁剪后的canvas
+                    const canvas = document.createElement('canvas');
+                    canvas.width = contentSize.width;
+                    canvas.height = contentSize.height;
+                    const ctx = canvas.getContext('2d');
+                    
+                    // 将图片的可见区域绘制到新canvas
+                    ctx.drawImage(
+                        img,
+                        contentSize.leftOffset, contentSize.topOffset,
+                        contentSize.width, contentSize.height,
+                        0, 0,
+                        contentSize.width, contentSize.height
+                    );
+                    
+                    const croppedImg = new Image();
+                    croppedImg.src = canvas.toDataURL('image/png');
+                    croppedImg.onload = () => resolve(croppedImg);
+                } catch (e) {
+                    reject(e);
+                }
+            };
+            img.onerror = reject;
+            img.src = url;
+        });
+    }
+
+    // 预加载并裁剪两张图片
+    let croppedImages = {
+        '帽': null,
+        '子': null
+    };
+    let imagesReady = false;
+
+    async function preloadImages() {
+        try {
+            croppedImages['帽'] = await loadAndCropImage(IMAGE_MAP['帽']);
+            croppedImages['子'] = await loadAndCropImage(IMAGE_MAP['子']);
+            imagesReady = true;
+            // 如果当前有输入，重新渲染
+            if (inputTextarea.value.trim()) {
+                generateHat();
+            }
+        } catch (e) {
+            console.error('图片加载失败', e);
+            errorMsgDiv.innerText = '图片加载失败，请检查网络或图片地址';
+        }
+    }
+
     const inputTextarea = document.getElementById('hatInput');
     const generateBtn = document.getElementById('generateBtn');
     const resetBtn = document.getElementById('resetBtn');
@@ -228,48 +297,54 @@
     const hatContainer = document.getElementById('hatContainer');
     const errorMsgDiv = document.getElementById('errorMsg');
 
-    // 核心渲染函数
+    // 核心渲染函数 - 使用裁剪后的图片，紧密堆叠
     function renderHatFromText(text) {
-        // 过滤掉空格、换行等，只保留 '帽' 和 '子'
+        if (!imagesReady) {
+            hatContainer.innerHTML = '<div class="loading-tip">⏳ 图片加载中，请稍候...</div>';
+            return;
+        }
+
         const chars = text.split('');
         const validChars = chars.filter(ch => ch === '帽' || ch === '子');
         
         if (validChars.length === 0) {
-            hatContainer.innerHTML = '<div style="color: #b87333; text-align: center; padding: 20px;">🍂 至少输入一个「帽」或「子」</div>';
+            hatContainer.innerHTML = '<div class="loading-tip">🍂 至少输入一个「帽」或「子」</div>';
             return;
         }
 
-        // 生成图片DOM
+        // 找出一组图片中的最大宽度，统一缩放比例（可选）
+        let maxWidth = 0;
+        for (const ch of validChars) {
+            const img = croppedImages[ch];
+            if (img && img.naturalWidth > maxWidth) {
+                maxWidth = img.naturalWidth;
+            }
+        }
+        
+        // 设定目标显示宽度（最大200px，同时保持比例）
+        const targetDisplayWidth = Math.min(maxWidth, 200);
+        
         const fragment = document.createDocumentFragment();
         for (let i = 0; i < validChars.length; i++) {
             const ch = validChars[i];
-            const imgUrl = IMAGE_MAP[ch];
-            if (!imgUrl) {
-                console.warn(`没有找到字符 "${ch}" 对应的图片`);
-                continue;
-            }
-            const img = document.createElement('img');
-            img.src = imgUrl;
-            img.alt = ch === '帽' ? '帽筒' : '帽沿';
-            img.style.display = 'block';
-            img.style.margin = '0 auto';
-            // 控制最大宽度，避免撑爆
-            img.style.maxWidth = '200px';
-            img.style.width = '100%';
-            img.style.height = 'auto';
-            // 为了视觉舒服，帽沿稍微横向延伸一点（可选，通过css控制）
-            if (ch === '子') {
-                img.style.width = '110%';
-                img.style.maxWidth = '220px';
-                img.style.marginLeft = '-5%';
-            }
-            fragment.appendChild(img);
+            const croppedImg = croppedImages[ch];
+            if (!croppedImg) continue;
+            
+            // 复制图片节点（因为同一个img不能重复append）
+            const clonedImg = croppedImg.cloneNode(true);
+            clonedImg.style.display = 'block';
+            clonedImg.style.margin = '0 auto';
+            // 统一宽度，高度自适应，确保对齐
+            clonedImg.style.width = targetDisplayWidth + 'px';
+            clonedImg.style.height = 'auto';
+            
+            fragment.appendChild(clonedImg);
         }
+        
         hatContainer.innerHTML = '';
         hatContainer.appendChild(fragment);
     }
 
-    // 生成并自动适应底部帽沿样式 (确保无论叠多少，最后一个是帽沿的时候看起来舒服)
     function generateHat() {
         let rawText = inputTextarea.value;
         if (!rawText.trim()) {
@@ -280,25 +355,22 @@
         renderHatFromText(rawText);
     }
 
-    // 清空输入 & 重置预览
     function resetAll() {
         inputTextarea.value = '';
-        hatContainer.innerHTML = '<div style="color: #b87333; text-align: center; padding: 20px;">✨ 输入「帽子」试试 ✨</div>';
+        hatContainer.innerHTML = '<div class="loading-tip">✨ 输入「帽子」试试 ✨</div>';
         errorMsgDiv.innerText = '';
     }
 
-    // 下载为图片 (使用 html2canvas)
     async function downloadAsImage() {
         const previewDiv = document.querySelector('.preview-area');
         if (!previewDiv) return;
         
-        // 临时添加更好的背景圆角捕捉
         try {
             const canvas = await html2canvas(previewDiv, {
                 backgroundColor: '#fef7e9',
-                scale: 2,          // 高清图
+                scale: 2,
                 logging: false,
-                useCORS: true,     // 如果你的图片支持跨域，或放在同域下最好
+                useCORS: true,
                 allowTaint: false
             });
             const link = document.createElement('a');
@@ -311,19 +383,26 @@
             }, 2000);
         } catch (err) {
             console.error(err);
-            errorMsgDiv.innerText = '❌ 截图失败，可能是图片跨域问题，可尝试将图片上传到同域名下';
+            errorMsgDiv.innerText = '❌ 截图失败，可能是图片跨域问题';
         }
     }
 
-    // 绑定事件
     generateBtn.addEventListener('click', generateHat);
     resetBtn.addEventListener('click', resetAll);
     downloadBtn.addEventListener('click', downloadAsImage);
     
-    // 初次加载演示 "帽子"
+    // 开始预加载图片
+    preloadImages();
+    
     window.addEventListener('DOMContentLoaded', () => {
         inputTextarea.value = '帽子';
-        generateHat();
+        // 等待图片加载完成后自动生成
+        const checkReady = setInterval(() => {
+            if (imagesReady) {
+                generateHat();
+                clearInterval(checkReady);
+            }
+        }, 100);
     });
 </script>
 </body>
